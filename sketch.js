@@ -4,11 +4,10 @@ let controlPoints = [];
 let N_POINTS = 30;
 let bg = undefined;
 
-let capturer;
-let duration = 15000;
-let startMillis = null;
-
 let img = undefined;
+
+let mode = 1;
+let x, y;
 
 function preload() {
   img = loadImage("images/flower.jpg");
@@ -19,7 +18,7 @@ function getPalette() {
   while(palette.length < colorNum) {
     palette = chromotome.get();
     if(!palette.background) {
-      palette = {};
+      palette = [];
       continue;
     }
     bg = color(palette.background);
@@ -47,102 +46,103 @@ function prepareControlPoints() {
 function setup() {
   createCanvas(img.width, img.height);
   frameRate(60);
-  noLoop();
 
   img.loadPixels();
   image(img, 0, 0);
 
   getPalette();
 
-  background(bg);
-  capturer = new CCapture({format: 'png', framerate: 60});
+  //background(bg);
 
   //other initializations needed
   prepareControlPoints();
+  x = y = 0;
 }
 
 function draw() {
-  if(frameCount === 1) {
-    capturer.start();
-  }
-  if(!startMillis)
-    startMillis = millis();
-  let elapsed = millis() - startMillis;
-  if(elapsed > duration) {
-    noLoop();
-    capturer.stop();
-    capturer.save();
-    return;
-  }
+  if(mode == 1) {
+    let c = findClosestColor(x,y);
+    writeColor(x, y, red(c), green(c), blue(c), alpha(c));
+  
+    if(random(1) > 0.8) {
+      getPalette();
+    }
 
-  for(let x = 0; x < img.width; x++) {
-    for(let y = 0; y < img.height; y++) {
-      let c = color(findClosestColor(x,y));
-      writeColor(x, y, red(c), green(c), blue(c), alpha(c));
-
-      if(random(1) > 0.8) {
-        getPalette();
+    if(y+1 == img.height) {
+      y = 0;
+      if(x + 1 == img.width) {
+        x = 0;
+        mode++;
+      } else {
+        x++;
       }
+    } else {
+      y++;
+    }
+  } else if (mode == 2) {
+    let point = findClosestControlPoint(x,y);
+    let color = getColor(point.x,point.y);
+    writeColor(x, y, color.r, color.g, color.b, color.a);
+
+    if(y+1 == img.height) {
+      y = 0;
+      if(x + 1 == img.width) {
+        noLoop()
+      } else {
+        x++;
+      }
+    } else {
+      y++;
     }
   }
 
   img.updatePixels();
-
-  for(let x = 0; x < img.width; x++) {
-    for(let y = 0; y < img.height; y++) {
-      let point = findClosestControlPoint(x,y);
-      let color = getColor(point.x,point.y);
-      writeColor(x, y, red(color), green(color), blue(color), alpha(color));
-    }
-  }
-
-  img.updatePixels();
-
-  capturer.capture(document.getElementById('defaultCanvas0'));
+  image(img, 0, 0);
 }
 
-function findClosestColor(x,y) {
-  let c = getColor(x,y);
-  let dist = 9999999;
+function findClosestColor(xcoord,ycoord) {
+  let c = getColor(xcoord,ycoord);
+  let dist = 999999;
   let closeColor = null;
 
   for(let i = 0; i < palette.length; i++) {
     let distance = calculateColorDistance(c, palette[i]);
-    if(distance < dist) {
+    if(distance <= dist) {
       dist = distance;
       closeColor = palette[i];
     }
   }
 
+
   return closeColor;
 }
 
-function findClosestControlPoint(x,y) {
-  let dist = 999999999;
+function findClosestControlPoint(xcoord,ycoord) {
+  let dist = 9999999;
 
   let point = controlPoints.find(element => element.x == x && element.y == y);
   if(point === undefined) {
     for(let i = 0; i < controlPoints.length; i++) {
-      let distance = calculateDistance(x, y, controlPoints[i].x, controlPoints[i].y);
+      let distance = calculateDistance(xcoord, ycoord, controlPoints[i].x, controlPoints[i].y);
       if(distance < dist) {
         dist = distance;
-        point = controlPoint[i];
+        point = controlPoints[i];
       }
     }
     return point;
   } else return point;
 }
 
-function writeColor(x, y, red, green, blue, alpha) {
-  let index = (x + y * width) * 4;
+function writeColor(xcoord, ycoord, red, green, blue, alpha) {
+  let index = (xcoord + ycoord * img.width) * 4;
   img.pixels[index] = red;
   img.pixels[index + 1] = green;
   img.pixels[index + 2] = blue;
   img.pixels[index + 3] = alpha;
 }
 
-function getColor(x,y) {
-  let index = (x + y * width) * 4;
+function getColor(xcoord, ycoord) {
+  let index = (xcoord + ycoord * img.width) * 4;
   let color = {};
   color.r = img.pixels[index];
   color.g = img.pixels[index + 1];
